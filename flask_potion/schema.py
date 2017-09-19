@@ -256,10 +256,13 @@ class FieldSet(Schema, ResourceBound):
     def parse_request(self, request):
         if request.method in ('POST', 'PATCH', 'PUT', 'DELETE'):
             if self.fields and request.mimetype != 'application/json':
-                raise RequestMustBeJSON()
+                # Allow when all fields are optional
+                if not all(((i.default is not None) or i.nullable
+                                for i in self.fields.values())):
+                    raise RequestMustBeJSON()
 
         # TODO change to request.get_json(silent=False) to catch invalid JSON
-        data = request.get_json(silent=True)
+        data = request.get_json(silent=True) or {}
 
         # FIXME raise error if request body is not JSON
 
