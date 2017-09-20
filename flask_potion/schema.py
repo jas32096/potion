@@ -208,6 +208,10 @@ class FieldSet(Schema, ResourceBound):
     def patchable(self):
         return SchemaImpl(self._schema(True))
 
+    @cached_property
+    def all_fields_optional(self):
+        return all(((i.default is not None) or i.nullable for i in (self.fields or {}).values()))
+
     def format(self, item):
         return OrderedDict((key, field.output(key, item)) for key, field in self.fields.items() if 'r' in field.io)
 
@@ -257,12 +261,14 @@ class FieldSet(Schema, ResourceBound):
         if request.method in ('POST', 'PATCH', 'PUT', 'DELETE'):
             if self.fields and request.mimetype != 'application/json':
                 # Allow when all fields are optional
-                if not all(((i.default is not None) or i.nullable
-                                for i in self.fields.values())):
+                if not self.all_fields_optional:
                     raise RequestMustBeJSON()
 
         # TODO change to request.get_json(silent=False) to catch invalid JSON
-        data = request.get_json(silent=True) or {}
+        data = request.get_json(silent=True)
+
+        if data is None and self.all_fields_optional:
+            data = {}
 
         # FIXME raise error if request body is not JSON
 
